@@ -53,7 +53,7 @@ class comment_map:
 			if file != prev_file:
 				print(f'// file: {file}')
 			# 情報出力
-			self.print_impl(item[1])
+			self.print_impl(item[1], name)
 			# 前回値更新
 			prev_file = file
 
@@ -67,13 +67,12 @@ class comment_map:
 			if file != prev_file:
 				print(f'// file: {file}')
 			# 情報出力
-			self.print_impl(item[1])
+			self.print_impl(item[1], name)
 			# 前回値更新
 			prev_file = file
 
-	def print_impl(self, n: node, parent_name="", depth=0):
+	def print_impl(self, n: node, name, parent_name="", depth=0):
 		# 共通情報作成
-		name = n.name
 		comment = n.comment
 		bit_size = n.bit_size
 		if name is None:
@@ -96,7 +95,7 @@ class comment_map:
 				# member
 				for mem in n.member.items():
 					mem_node = mem[1]
-					self.print_impl(mem_node, name+".", depth+1)
+					self.print_impl(mem_node, mem_node.name, name+".", depth+1)
 
 			case _:
 				pass
@@ -125,11 +124,13 @@ class comment_get:
 
 		self.comment = None
 		# 正規表現定義
+		# identifier
+		s_id = r'[a-zA-Z_][a-zA-Z0-9_]+'
 		# 行にコメントのみ
 		self.str_comment_var_name = r"^\s*//\s*(.+)$"
 		# struct
 		# nest=0 : 最上位構造体定義
-		self.str_struct = r"^\s*(?:(typedef)\s+)?(?:struct|union)\s+([a-zA-Z0-9_]+)?\s*(?:{?\s*)$"
+		self.str_struct = r'^\s*(?:(typedef)\s+)?(?:struct|union)\s+(' + s_id + r')?\s*(?:{?\s*)$'
 		# next=1~ : 構造体内構造体定義
 		# 1行で記述するケース
 		self.str_struct_inner_1 = r"^\s*(?:struct|union)\s+(?:([a-zA-Z0-9_]+)\s+)?{\s*$"
@@ -137,10 +138,10 @@ class comment_get:
 		self.str_struct_inner_2_1 = r"^\s*(?:struct|union)\s+(?:([a-zA-Z0-9_]+)\s+)?$"
 		self.str_struct_inner_2_2 = r"^\s*{\s+$"
 		# 構造体member
-		self.str_struct_member = r"[^}]+\s+([a-zA-Z0-9_]+)\s*(?:\:\s*(\d+)\s*)?;\s*(?:(})\s*([a-zA-Z0-9_]+)?\s*;\s*)?//\s*(.*)$"
+		self.str_struct_member = r"[^}]+\s+([a-zA-Z0-9_]+)\s*(?:\:\s*(\d+)\s*)?;\s*(?:(})\s*([a-zA-Z0-9_]+)?\s*;\s*)?(?://\s*(.*))?.*$"
 		self.re_struct_member = re.compile(self.str_struct_member)
 		# 構造体終了
-		self.str_strunt_end = r"^\s*}\s*(?:([a-zA-Z0-9_]+)\s*)?;\s*(?://\s*(.*))?.*$"
+		self.str_strunt_end = r"^\s*}\s*(?:([a-zA-Z0-9_]+)\s*)?(?:;\s*(?://\s*(.*))|=\s*{)?.*$"
 		self.re_strunt_end = re.compile(self.str_strunt_end)
 
 		# 変数宣言
@@ -152,7 +153,6 @@ class comment_get:
 		# 結合
 		#self.str_type = rf"^\s*(?:{s_type_sq}\s+)*"
 		# 簡略版
-		s_id = r'[a-zA-Z_][a-zA-Z0-9_]+'
 		self.str_var = fr"^\s*.*?({s_id})\s*(?:=\s*[a-zA-Z0-9_]+\s*)?;\s*(?://\s*(.*))?.*$"
 		self.re_var = re.compile(self.str_var)
 
@@ -343,6 +343,10 @@ class comment_get:
 		# 処理継続
 		return None
 
+	def proc_prefix_comment_reset(self, line_no:int, line:str, cond_log:gram.cond_log_list) -> int:
+		# 他のルールにマッチせずここまでたどり着いた時点で
+		# 前置コメントは無効とみなす。
+		return 99
 
 	def proc3(self, line_no:int, line:str, cond_log:gram.cond_log_list) -> int:
 		line = line.strip()
@@ -418,7 +422,7 @@ rule = gram(
 						adapter.proc_struct_member_0
 					]
 				),
-				adapter.proc3
+				adapter.proc_prefix_comment_reset
 			]
 		),
 		# 構造体_前置コメントなし

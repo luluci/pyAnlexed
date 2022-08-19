@@ -19,7 +19,18 @@ typedef struct
 	unsigned B_mem_2;		// Bメンバ2
 } B_obj;					// Bオブジェクト
 
+// 構造体C
+struct {
+	uint8_t id;
+} C_obj = {0};
 
+// 構造体D
+struct
+{
+	uint8_t id;
+} D_obj = {
+	0
+};
 
 // 構造体X
 typedef struct tag_X
@@ -67,6 +78,8 @@ struct tag_Z
 
 int u32_2;		// global int var2
 
+//////////////
+// 関数ヘッダ
 int main(void) {
 	int local_x = 0;		// local x
 	int local_y;			// local y
