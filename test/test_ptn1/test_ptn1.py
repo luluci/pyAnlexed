@@ -156,6 +156,11 @@ class comment_get:
 		self.str_var = fr"^\s*.*?({s_id})\s*(?:=\s*[a-zA-Z0-9_]+\s*)?;\s*(?://\s*(.*))?.*$"
 		self.re_var = re.compile(self.str_var)
 
+		# 関数定義
+		self.str_func_def = fr'^\s*.*?({s_id})\s*\([^)]*\).*$'
+		self.str_func_def_end = '^[^}]*}.*$'
+		self.re_func_def_end = re.compile(self.str_func_def_end)
+
 		# 解析バッファ
 		# struct定義のネストは2つまで許可
 		self.log_struct_nest = 2
@@ -348,6 +353,15 @@ class comment_get:
 		# 前置コメントは無効とみなす。
 		return 99
 
+	def proc_func_def(self, line_no:int, line:str, cond_log:gram.cond_log_list) -> int:
+		#
+		line = line.strip()
+		m = self.re_func_def_end.search(line)
+		if m is not None:
+			return 99
+		# 処理継続
+		return 0
+
 	def proc3(self, line_no:int, line:str, cond_log:gram.cond_log_list) -> int:
 		line = line.strip()
 		print(f"  proc3: {line_no+1}: {line}")
@@ -457,6 +471,11 @@ rule = gram(
 				# member変数
 				adapter.proc_struct_member_0
 			]
+		),
+		# 関数定義読み捨て用
+		gram(
+			adapter.str_func_def,
+			adapter.proc_func_def
 		),
 		adapter.proc_global_var
 	]
