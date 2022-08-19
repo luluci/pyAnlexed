@@ -152,7 +152,8 @@ class comment_get:
 		# 結合
 		#self.str_type = rf"^\s*(?:{s_type_sq}\s+)*"
 		# 簡略版
-		self.str_var = r"([a-zA-Z0-9_]+)\s*;\s*(?://\s*(.*))?.*$"
+		s_id = r'[a-zA-Z_][a-zA-Z0-9_]+'
+		self.str_var = fr"^\s*.*?({s_id})\s*(?:=\s*[a-zA-Z0-9_]+\s*)?;\s*(?://\s*(.*))?.*$"
 		self.re_var = re.compile(self.str_var)
 
 		# 解析バッファ
