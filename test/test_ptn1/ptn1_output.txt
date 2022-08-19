@@ -1,0 +1,64 @@
+// var_info
+// file: test1.c
+u8_1                                     : flag1
+u8_2                                     : フラグ2
+u8_3                                     : フラグ3
+u32_1                                    : global int var1
+<struct>A_obj                            : 構造体A
+  A_obj.A                                : <uncommented>
+<struct>C_obj                            : 構造体C
+  C_obj.id                               : <uncommented>
+<struct>D_obj                            : 構造体D
+  D_obj.id                               : <uncommented>
+<struct>Z                                : 変数Z
+  Z.mem1                                 : mem1
+  Z.mem2                                 : member2
+  Z.mem3                                 : メンバ3
+  Z.mem5                                 : member5
+  <struct>Z.mem4                         : member4
+    Z.mem4.mem4_1                        : member4-1
+    Z.mem4.mem4_2                        : member4-2
+u32_2                                    : global int var2
+
+// type_info
+<struct>tag_A                            : 構造体A
+  tag_A.A                                : <uncommented>
+<struct>B_obj                            : Bオブジェクト
+  B_obj.B_mem_1                          : Bメンバ1
+  B_obj.B_mem_2                          : Bメンバ2
+<struct>tag_X                            : 構造体X
+  tag_X.mem1                             : mem1
+  tag_X.mem2                             : member2
+  tag_X.mem3                             : メンバ3
+  <struct>tag_X.mem4                     : member4
+    tag_X.mem4.mem4_1                    : member4-1
+  <struct>tag_X.mem5                     : member5
+    tag_X.mem5.mem5_1 (4 bit)            : member5-1
+    tag_X.mem5.mem5_2 (2 bit)            : member5-2
+    tag_X.mem5.mem5_3 (1 bit)            : member5-3
+    tag_X.mem5.mem5_4 (1 bit)            : member5-4
+<struct>X                                : 構造体X
+  X.mem1                                 : mem1
+  X.mem2                                 : member2
+  X.mem3                                 : メンバ3
+  <struct>X.mem4                         : member4
+    X.mem4.mem4_1                        : member4-1
+  <struct>X.mem5                         : member5
+    X.mem5.mem5_1 (4 bit)                : member5-1
+    X.mem5.mem5_2 (2 bit)                : member5-2
+    X.mem5.mem5_3 (1 bit)                : member5-3
+    X.mem5.mem5_4 (1 bit)                : member5-4
+<struct>Y                                : 構造体Y
+  Y.mem1                                 : mem1
+  <struct>Y.mem1_bf                      : <uncommented>
+    Y.mem1_bf.b1 (1 bit)                 : bf1
+    Y.mem1_bf.b2 (1 bit)                 : bf2
+    Y.mem1_bf.b3 (6 bit)                 : bf3
+<struct>tag_Z                            : 変数Z
+  tag_Z.mem1                             : mem1
+  tag_Z.mem2                             : member2
+  tag_Z.mem3                             : メンバ3
+  tag_Z.mem5                             : member5
+  <struct>tag_Z.mem4                     : member4
+    tag_Z.mem4.mem4_1                    : member4-1
+    tag_Z.mem4.mem4_2                    : member4-2
