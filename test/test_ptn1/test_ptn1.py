@@ -13,6 +13,7 @@ import re
 from typing import Dict
 
 path_str = "./ptn1"
+#path_str = "../test_ptn2"
 path_str = os.path.join(os.path.dirname(__file__), path_str)
 tgt_path = pathlib.Path(path_str)
 
@@ -148,14 +149,14 @@ class comment_get:
         # 結合
         # self.str_type = rf"^\s*(?:{s_type_sq}\s+)*"
         # 簡略版
-        self.str_var = rf"^\s*.*?({s_id})\s*(?:=\s*[a-zA-Z0-9_]+\s*)?;\s*(?://\s*(.*))?.*$"
+        self.str_var = rf"^\s*[^/][^/*].*?({s_id})\s*(?:=\s*[a-zA-Z0-9_]+\s*)?;\s*(?://\s*(.*))?.*$"
         self.re_var = re.compile(self.str_var)
 
         # プロトタイプ宣言
         # セミコロンだけ改行するようなケースはコーディング規約でなんとかして
-        self.str_prototype = rf"^\s*.*?({s_id})\s*\([^)]*\)[^;]*;.*$"
+        self.str_prototype = rf"^\s*[^/][^/*].*?({s_id})\s*\([^)]*\)[^;]*;.*$"
         # 関数定義
-        self.str_func_def = rf"^\s*.*?({s_id})\s*\([^)]*\)[^;]*$"
+        self.str_func_def = rf"^\s*[^/][^/*].*?({s_id})\s*\([^)]*\)[^;]*$"
         self.str_func_def_end = "^[^}]*}.*$"
         self.re_func_def_end = re.compile(self.str_func_def_end)
 
@@ -507,7 +508,7 @@ rule = gram(
         adapter.proc_global_var,
     ],
 )
-rule.analyze(tgt_path, "utf8", adapter.file_change)
+rule.analyze(tgt_path, "**/*.[ch]", "utf8", adapter.file_change)
 adapter.comment_map.print()
 
 """
