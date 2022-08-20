@@ -21,8 +21,11 @@ u32_1                                    : global int var1
 u32_2                                    : global int var2
 flag_1                                   : フラグ1
 flag_2                                   : フラグ2
+// file: test3.c
+mem3                                     : <uncommented>
 
 // type_info
+// file: test1.c
 <struct>tag_A                            : 構造体A
   tag_A.A                                : <uncommented>
 <struct>B_t                              : B型
@@ -64,3 +67,8 @@ flag_2                                   : フラグ2
   <struct>tag_Z.mem4                     : member4
     tag_Z.mem4.mem4_1                    : member4-1
     tag_Z.mem4.mem4_2                    : member4-2
+// file: test3.c
+<struct>sin_file_div                     : <uncommented>
+  sin_file_div.mem1                      : <uncommented>
+  sin_file_div.mem2                      : <uncommented>
+  sin_file_div.mem3                      : <uncommented>

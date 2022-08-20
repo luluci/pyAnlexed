@@ -340,12 +340,13 @@ class comment_get:
                 node.name = post_name
             # 構造体宣言の後ろに記載された識別子の処置
             # typedef設定のときは構造体定義の後ろの識別子は型名
-            if inf[0] is not None:
-                # 型登録
-                temp_map.type_map[(self.rel_path, post_name)] = node
-            else:
-                # 変数登録
-                temp_map.var_map[(self.rel_path, post_name)] = node
+            if post_name is not None:
+                if inf[0] is not None:
+                    # 型登録
+                    temp_map.type_map[(self.rel_path, post_name)] = node
+                else:
+                    # 変数登録
+                    temp_map.var_map[(self.rel_path, post_name)] = node
             # 処理終了
             self.log_member[nest] = []
             self.log_nest[nest + 1] = []

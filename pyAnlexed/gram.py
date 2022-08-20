@@ -131,10 +131,25 @@ class gram:
         """
         新規ファイルの解析を開始するときにコールされる
         """
+        # コールバック実行
         if self.file_change_cb is not None:
             if self.file_change_cb(p):
                 self.cond_pos = 0
                 self.cond_state = False
+        # 全gramを初期化
+        self.reset_gram(self)
+
+    def reset_gram(self, node):
+        node: gram
+        # 自分をリセット
+        node.reset_cond()
+        #
+        for adapt in node.adapts:
+            match adapt:
+                case gram():
+                    self.reset_gram(adapt)
+                case _:
+                    pass
 
     def set_root(self):
         pass
