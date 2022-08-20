@@ -158,8 +158,11 @@ class comment_get:
         self.str_var = rf"^\s*.*?({s_id})\s*(?:=\s*[a-zA-Z0-9_]+\s*)?;\s*(?://\s*(.*))?.*$"
         self.re_var = re.compile(self.str_var)
 
+        # プロトタイプ宣言
+        # セミコロンだけ改行するようなケースはコーディング規約でなんとかして
+        self.str_prototype = rf"^\s*.*?({s_id})\s*\([^)]*\)[^;]*;.*$"
         # 関数定義
-        self.str_func_def = rf"^\s*.*?({s_id})\s*\([^)]*\).*$"
+        self.str_func_def = rf"^\s*.*?({s_id})\s*\([^)]*\)[^;]*$"
         self.str_func_def_end = "^[^}]*}.*$"
         self.re_func_def_end = re.compile(self.str_func_def_end)
 
@@ -199,6 +202,9 @@ class comment_get:
             node.comment = parts[1]
             # 変数登録
             self.comment_map.var_map[(self.rel_path, node.name)] = node
+        
+        # 無条件ルールなのでなんでもいい
+        return gram.ExecResult.Reset_1
 
     def proc_struct_member_0(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
         """
@@ -309,14 +315,10 @@ class comment_get:
                 node.member[is_mem.name] = is_mem
 
             # 前提条件の条件マッチ状況から情報取得
-            p_log = None
-            if cond_log.parent is not None and len(cond_log.parent.log) > 0:
-                # parentが存在しているとき、
-                # 構造体宣言直前に記載されたコメント情報
-                p_log = cond_log.parent.log[0].match.groups()
-                p_name = cond_log.parent.log[0].name
-                if p_name == "前置コメント":
-                    node.comment = p_log[0]
+            if cond_log.parent is not None:
+                pre_comme = self.get_prefix_comment(cond_log.parent)
+                if pre_comme is not None:
+                    node.comment = pre_comme
             # 1段目のメンバーなので直前のマッチ結果から構造体情報取得
             log_m = cond_log.log[0].match
             inf = log_m.groups()
@@ -352,10 +354,43 @@ class comment_get:
         # 処理継続
         return None
 
-    def proc_prefix_comment_reset(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
-        # 他のルールにマッチせずここまでたどり着いた時点で
-        # 前置コメントは無効とみなす。
-        return gram.ExecResult.ResetAll
+    def proc_prefix_comment(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
+        # 構造体以外の解析を実施する
+        line = line.strip()
+
+        # 変数チェック
+        m = self.re_var.search(line)
+        if m is not None:
+            # [0]=変数名, [1]=コメント
+            parts = m.groups()
+            # 新規ノード作成
+            node = comment_map.node()
+            node.tag = comment_map.node.TAG.base
+            node.name = parts[0]
+            node.comment = parts[1]
+            # 前置コメント取得
+            comment = self.get_prefix_comment(cond_log)
+            if node.comment is None:
+                node.comment = comment
+            # 変数登録
+            self.comment_map.var_map[(self.rel_path, node.name)] = node
+            # 前置コメント消化したので次の行から解析再開
+            return gram.ExecResult.Reset_1
+
+        # マッチ無しのとき、今回出現した行を再解析する
+        return gram.ExecResult.OneMore
+
+    def get_prefix_comment(self, cond_log: gram.cond_log_list):
+        # 指定したcond_log_listから前置コメントを取得して返す
+        comment = None
+        #
+        if len(cond_log.log) > 0:
+            log_match = cond_log.log[0].match.groups()
+            log_name = cond_log.log[0].name
+            if log_name == "前置コメント":
+                comment = log_match[0]
+        #
+        return comment
 
     def proc_func_def(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
         #
@@ -439,7 +474,7 @@ rule = gram(
                         adapter.proc_struct_member_0,
                     ],
                 ),
-                adapter.proc_prefix_comment_reset,
+                adapter.proc_prefix_comment,
             ],
         ),
         # 構造体_前置コメントなし

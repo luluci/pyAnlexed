@@ -34,6 +34,8 @@ class gram:
         ResetAll = -1
         # 現ファイルの解析は中断して次のファイルの解析に移行する
         NextFile = -2
+        # 同じ行を再解析する
+        OneMore = -3
 
     FileChangeFunc = Callable[[pathlib.Path], bool]
     ExecFunc = Callable[[int, str, cond_log_list], int]
@@ -172,11 +174,26 @@ class gram:
         # ファイルを開いて1行ずつ処理する
         with path.open("r", encoding=self.encoding) as ifs:
             for line_no, line in enumerate(ifs.readlines()):
-                if line_no == 32:
-                    pass
-                result = self.analyze_line(path, line_no, line)
-                # if result > 0:
-                # 	pass
+                # フラグセット
+                loop = True
+                set_break = False
+                # 解析実施
+                while loop:
+                    result = self.analyze_line(path, line_no, line)
+                    # 実行結果チェック
+                    match result:
+                        case gram.ExecResult.NextFile:
+                            # ループ中断して次のファイルへ移行
+                            set_break = True
+                            loop = False
+                        case gram.ExecResult.OneMore:
+                            loop = True
+                        case _:
+                            # 何もしない
+                            loop = False
+                # 後処理
+                if set_break:
+                    break
 
     def analyze_line(self, path: pathlib.Path, line_no: int, line: str) -> int:
         """
@@ -216,6 +233,9 @@ class gram:
                             case gram.ExecResult.NextFile:
                                 # 最上位まで伝搬させる
                                 pass
+                            case gram.ExecResult.OneMore:
+                                # 条件クリアして再解析
+                                adapt.reset_cond()
                             case _:
                                 # 0, 上記以外は何もしない
                                 pass

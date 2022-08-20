@@ -17,7 +17,7 @@ typedef struct
 {
 	unsigned char B_mem_1;	// Bメンバ1
 	unsigned B_mem_2;		// Bメンバ2
-} B_obj;					// Bオブジェクト
+} B_t;						// B型
 
 // 構造体C
 struct {
@@ -78,9 +78,28 @@ struct tag_Z
 
 int u32_2;		// global int var2
 
+// フラグ類
+// フラグ1
+unsigned char flag_1 = 0;
+// フラグ2
+unsigned char flag_2 = 0;
+
+// プロトタイプ宣言
+void funcA(struct tag_A);
+void funcB(B_t, struct tag_Z);
+
 //////////////
 // 関数ヘッダ
-int main(void) {
+//////////////
+void funcB(B_t b_obj, struct tag_Z z_obj) {
+	b_obj.B_mem_1 = 1;
+}
+
+//////////////
+// 関数ヘッダ
+//////////////
+int main(void)
+{
 	int local_x = 0;		// local x
 	int local_y;			// local y
 
