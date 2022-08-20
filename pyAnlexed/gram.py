@@ -189,26 +189,24 @@ class gram:
         # ファイルを開いて1行ずつ処理する
         with path.open("r", encoding=self.encoding) as ifs:
             for line_no, line in enumerate(ifs.readlines()):
-                # フラグセット
-                loop = True
-                set_break = False
-                # 解析実施
-                while loop:
+                is_loop = True
+                while is_loop:
+                    is_loop = False
+
+                    # 解析実施
                     result = self.analyze_line(path, line_no, line)
                     # 実行結果チェック
                     match result:
                         case gram.ExecResult.NextFile:
                             # ループ中断して次のファイルへ移行
-                            set_break = True
-                            loop = False
+                            break
                         case gram.ExecResult.OneMore:
-                            loop = True
+                            # 何もしない
+                            is_loop = True
+                            pass
                         case _:
                             # 何もしない
-                            loop = False
-                # 後処理
-                if set_break:
-                    break
+                            pass
 
     def analyze_line(self, path: pathlib.Path, line_no: int, line: str) -> int:
         """
@@ -219,47 +217,60 @@ class gram:
         適用条件成立状況は is_adapt_active に記憶する。
         処理実行後のgram終了判定は戻り値で判定する。
         """
+        if line_no == 81:
+            pass
         is_active = False
-        adapt_result = 0
+        adapt_result = gram.ExecResult.Hold
         for adapt in self.adapts:
-            match adapt:
-                case gram():
-                    if not adapt.cond_state:
-                        # 適用条件未成立時は条件判定実施
-                        # gramノードは条件判定
-                        if is_active:
-                            # 上位条件が成立している場合は不成立設定
-                            adapt.reset_cond()
+            is_loop = True
+            while is_loop:
+                is_loop = False
+                # 処理実施
+                match adapt:
+                    case gram():
+                        if not adapt.cond_state:
+                            # 適用条件未成立時は条件判定実施
+                            # gramノードは条件判定
+                            if is_active:
+                                # 上位条件が成立している場合は不成立設定
+                                adapt.reset_cond()
+                            else:
+                                # 上位条件が成立していない場合は通常の条件判定
+                                is_active = adapt.exec_cond(path, line_no, line)
                         else:
-                            # 上位条件が成立していない場合は通常の条件判定
-                            is_active = adapt.exec_cond(path, line_no, line)
-                    else:
-                        # 適用条件成立後、次の周期から処理実施
-                        is_active = True
-                        adapt_result = adapt.exec_adapt(path, line_no, line)
-                        # 戻り値で指定された分だけgramの条件成立を解除する
-                        match adapt_result:
-                            case val if val > 0:
-                                # 通常の解除ケース
-                                adapt_result -= 1
-                                adapt.reset_cond()
-                            case gram.ExecResult.ResetAll:
-                                adapt.reset_cond()
-                            case gram.ExecResult.NextFile:
-                                # 最上位まで伝搬させる
-                                pass
-                            case gram.ExecResult.OneMore:
-                                # 条件クリアして再解析
-                                adapt.reset_cond()
-                            case _:
-                                # 0, 上記以外は何もしない
-                                pass
+                            # 適用条件成立後、次の周期から処理実施
+                            is_active = True
+                            adapt_result = adapt.exec_adapt(path, line_no, line)
+                            # 戻り値で指定された処理を実施
+                            match adapt_result:
+                                case val if val > 0:
+                                    # 通常の解除ケース
+                                    adapt_result -= 1
+                                    adapt.reset_cond()
+                                case gram.ExecResult.ResetAll:
+                                    adapt.reset_cond()
+                                case gram.ExecResult.NextFile:
+                                    # 最上位まで伝搬させる
+                                    pass
+                                case gram.ExecResult.OneMore:
+                                    # 条件クリアして再解析
+                                    adapt.reset_cond()
+                                    is_loop = True
+                                    is_active = False
+                                    # 1回ループしたらクリア
+                                    adapt_result = gram.ExecResult.Hold
+                                case _:
+                                    # 0, 上記以外は何もしない
+                                    pass
 
-                case _:
-                    if not is_active:
-                        # gram以外のノードはExecFuncを想定
-                        is_active = True
-                        adapt_result = adapt(line_no, line, self.cond_log)
+                    case _:
+                        if not is_active:
+                            # gram以外のノードはExecFuncを想定
+                            is_active = True
+                            adapt_result = adapt(line_no, line, self.cond_log)
+                            # 生コールバック関数の場合、
+                            # 値をそのまま上位に渡して、上位で処理を行う
+
         self.is_adapt_active = is_active
 
         return adapt_result

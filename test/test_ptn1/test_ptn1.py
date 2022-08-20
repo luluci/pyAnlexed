@@ -103,13 +103,6 @@ class comment_map:
 
 class comment_get:
 
-    # 有効なprocを格納
-    class mode(enum.Enum):
-        null = enum.auto()
-        proc1 = enum.auto()
-        proc2 = enum.auto()
-        proc3 = enum.auto()
-
     # 解析中のC grammar
     class state(enum.Enum):
         null = enum.auto()
@@ -178,11 +171,6 @@ class comment_get:
     def file_change(self, p: pathlib.Path) -> bool:
         self.rel_path = p.relative_to(self.tgt_path)
         print(f"file: {str(p)}")
-
-    def proc1(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
-        line = line.strip()
-        print(f"  proc1: {line}")
-        return gram.ExecResult.Hold
 
     def proc_global_var(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
         """
@@ -402,27 +390,15 @@ class comment_get:
         # 処理継続
         return gram.ExecResult.Hold
 
-    def proc3(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
-        line = line.strip()
-        print(f"  proc3: {line_no+1}: {line}")
-
-        # if line == "":
-        # 	return False
-        return gram.ExecResult.Hold
-
-    def proc4(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
-        line = line.strip()
-        print(f"  proc4: {line_no+1}: {line}")
-        return gram.ExecResult.Hold
 
 
 adapter = comment_get(tgt_path)
+
 
 # 作成ルールより深いstruct定義ネストがあれば警告を出す
 def unexpected_struct_def_nested_func(line_no: int, line: str, cond_log: gram.cond_log_list):
     print(f"unexpected struct def nested: {cond_log.get_filename()} :{line_no}: {line}")
     return gram.ExecResult.Reset_1
-
 
 rule_unexpected_struct_def_nested_1 = gram(adapter.str_struct_inner_1, unexpected_struct_def_nested_func)
 rule_unexpected_struct_def_nested_2 = gram(
@@ -434,9 +410,22 @@ rule_unexpected_struct_def_nested_2 = gram(
 )
 
 
+def proc_terminate(line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
+    return gram.ExecResult.NextFile
+
+rule_terminate = gram(
+    [
+        r"//\s*解析.*$",
+        r"//\s*ここまで.*$",
+    ],
+    proc_terminate
+)
+
+
 rule = gram(
     None,
     [
+        rule_terminate,
         gram(
             # 適用条件
             ("前置コメント", r"^\s*//\s*(.+)$"),
@@ -475,6 +464,8 @@ rule = gram(
                         adapter.proc_struct_member_0,
                     ],
                 ),
+                # 関数定義読み捨て用
+                gram(adapter.str_func_def, adapter.proc_func_def),
                 adapter.proc_prefix_comment,
             ],
         ),

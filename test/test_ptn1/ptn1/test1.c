@@ -88,6 +88,9 @@ unsigned char flag_2 = 0;
 void funcA(struct tag_A);
 void funcB(B_t, struct tag_Z);
 
+// 宣言
+// ここまで
+
 //////////////
 // 関数ヘッダ
 //////////////
@@ -105,3 +108,12 @@ int main(void)
 
 	return 0;
 }
+
+
+/////////////////
+// 解析
+// ここまで
+
+uint8_t yomisute1;				// yomisute1_comment
+unsigned yomisute2 = 0x88;		// yomisute2_comment
+
