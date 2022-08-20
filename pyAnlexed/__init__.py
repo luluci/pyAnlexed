@@ -1,3 +1,2 @@
-
 from .gram import gram
-from .pyAnlexed import (analyze)
+from .pyAnlexed import analyze
