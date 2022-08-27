@@ -158,7 +158,7 @@ class gram:
     parent要素側処理
     """
 
-    def analyze(self, path: pathlib.Path, glob:str = '**/*', encoding="cp932", fc: FileChangeFunc = None):
+    def analyze(self, path: pathlib.Path, glob: str = "**/*", encoding="cp932", fc: FileChangeFunc = None):
         """
         analyzeがコールされたノードはルールを無視してadaptsの判定だけ実施
         """
@@ -178,7 +178,7 @@ class gram:
         else:
             raise Exception(f"path is not file/dir: {str(path)}")
 
-    def analyze_dir(self, path: pathlib.Path, glob:str):
+    def analyze_dir(self, path: pathlib.Path, glob: str):
         for p in path.glob(glob):
             self.analyze_file(p)
 

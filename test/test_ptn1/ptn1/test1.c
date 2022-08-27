@@ -1,6 +1,10 @@
 
 #include <stdio.h>
 
+#define MACRO1(x,y) x = y;
+
+static const unsigned char const* str1 = "hoge";	// string-1
+
 unsigned char					u8_1;				// flag1
 extern unsigned char			u8_2 = TRUE;		// フラグ2
 extern volatile unsigned char	u8_3 = 0;			// フラグ3
@@ -22,7 +26,7 @@ typedef struct
 // 構造体C
 struct {
 	uint8_t id;
-} C_obj = {0};
+} C_obj[4] = {{0}, {0}, {0}, {0}};
 
 // 構造体D
 struct
@@ -58,6 +62,17 @@ typedef union {
 		uint8_t b2		:1; // bf2
 		uint8_t b3		:6; // bf3
 	} mem1_bf;
+	struct {
+		uint8_t b1		:1; // bf1
+		uint8_t b2		:1; // bf2
+		uint8_t b3		:6; // bf3
+	} mem2_bf;
+	struct
+	{
+		uint8_t b1 : 1; // bf1
+		uint8_t b2 : 1; // bf2
+		uint8_t b3 : 6; // bf3
+	} mem3_bf;
 } Y;
 
 
@@ -76,7 +91,26 @@ struct tag_Z
 	WORD mem5;			// member5
 } Z;	// 変数Z
 
+typedef struct {
+	uint8_t mem1[1];			// member1
+	uint8_t mem2[2][2];			// member2
+	uint8_t mem3[3][3][3];		// member3
+
+	struct {
+		uint8_t mem4_1;
+		uint8_t mem4_2;			// member4-2
+	} mem4[4];
+} XX;
+
 int u32_2;		// global int var2
+int u32_3[3];	// global int var3
+int u32_4[] = {1, 2, 3, 4}; // global int var4
+int u32_5[][4] = {{1, 2, 3, 4}}; // global int var5
+// global int var6
+int u32_6[6][6] = {
+	{1, 2, 3, 4, 5, 6},
+	{1, 2, 3, 4, 5, 6},
+};
 
 // フラグ類
 // フラグ1

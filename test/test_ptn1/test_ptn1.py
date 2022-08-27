@@ -13,7 +13,8 @@ import re
 from typing import Dict
 
 path_str = "./ptn1"
-#path_str = "../test_ptn2"
+# path_str = r"D:\home\RX\abs_test"
+# path_str = "../test_ptn2"
 path_str = os.path.join(os.path.dirname(__file__), path_str)
 tgt_path = pathlib.Path(path_str)
 
@@ -104,36 +105,47 @@ class comment_map:
 
 class comment_get:
 
-    # 解析中のC grammar
-    class state(enum.Enum):
-        null = enum.auto()
-        typedef_struct = enum.auto()
+    # ファイル情報の残し方
+    class file_info(enum.Enum):
+        ignore = enum.auto()  # ファイル情報を残さない
+        rel = enum.auto()  # 相対パスを記憶
+        abs = enum.auto()  # 絶対パスを記憶
 
-    def __init__(self, tgt_path: pathlib.Path) -> None:
-        # 相対パスを取るようの探索開始パス
-        self.tgt_path = tgt_path
-        self.rel_path = None
+    def __init__(self, base_path: pathlib.Path, nest: int = 2, file_inf: file_info = file_info.rel) -> None:
+        # ファイル情報の使い方
+        self.file_inf = file_inf
+        # 探索開始起点パス
+        self.base_path = base_path
+        # ファイル情報パス
+        self.tgt_path = None
+
         # コメント情報マップ
         self.comment_map = comment_map()
 
         self.comment = None
         # 正規表現定義
         # identifier
-        s_id = r"[a-zA-Z_][a-zA-Z0-9_]+"
+        s_id = r"[a-zA-Z_][a-zA-Z0-9_]*"
+        # [type]* id
+        s_type_id = rf"(?:[^#/][^/*]{s_id}[*&]*\s+)?(?:[*&]*{s_id}[*&]*\s+)*?({s_id})\s*(?:\[[^]]*\]\s*)*"
         # 行にコメントのみ
         self.str_comment_var_name = r"^\s*//\s*(.+)$"
         # struct
         # nest=0 : 最上位構造体定義
-        self.str_struct = r"^\s*(?:(typedef)\s+)?(?:struct|union)\s+(" + s_id + r")?\s*(?:{?\s*)$"
+        self.str_struct = rf"^\s*(?:(typedef)\s+)?(?:struct|union)\s*(?:({s_id})\s*)?(?:{{?\s*)(?://\s*(.*))?$"
         # next=1~ : 構造体内構造体定義
         # 1行で記述するケース
-        self.str_struct_inner_1 = r"^\s*(?:struct|union)\s+(?:([a-zA-Z0-9_]+)\s+)?{\s*$"
+        self.str_struct_inner_1 = r"^\s*(?:struct|union)(?:\s+([a-zA-Z0-9_]+))?\s*{\s*(?://\s*(.*))?$"
         # 改行を入れてカッコを次行にするケース。空行を入れるケースは無視する。
-        self.str_struct_inner_2_1 = r"^\s*(?:struct|union)\s+(?:([a-zA-Z0-9_]+)\s+)?$"
+        self.str_struct_inner_2_1 = r"^\s*(?:struct|union)(?:\s+([a-zA-Z0-9_]+)\s*)?(?://\s*(.*))?$"
         self.str_struct_inner_2_2 = r"^\s*{\s+$"
+        self.str_struct_inner_2 = [
+            self.str_struct_inner_2_1,
+            self.str_struct_inner_2_2,
+        ]
         # 構造体member
         self.str_struct_member = (
-            r"[^}]+\s+([a-zA-Z0-9_]+)\s*(?:\:\s*(\d+)\s*)?;\s*(?:(})\s*([a-zA-Z0-9_]+)?\s*;\s*)?(?://\s*(.*))?.*$"
+            fr"^\s*{s_type_id}\s*(?:\:\s*(\d+)\s*)?;\s*(?:(}})\s*(?:({s_id})\s*)?;)?\s*(?://\s*(.*))?$"
         )
         self.re_struct_member = re.compile(self.str_struct_member)
         # 構造体終了
@@ -149,20 +161,24 @@ class comment_get:
         # 結合
         # self.str_type = rf"^\s*(?:{s_type_sq}\s+)*"
         # 簡略版
-        self.str_var = rf"^\s*[^/][^/*].*?({s_id})\s*(?:=\s*[a-zA-Z0-9_]+\s*)?;\s*(?://\s*(.*))?.*$"
-        self.re_var = re.compile(self.str_var)
+        # type id (= id/number)? ; // comment
+        self.str_var_1 = rf"^\s*{s_type_id}\s*(?:=\s*(?:[a-zA-Z0-9_]+|\"[^\"]*\")\s*)?;\s*(?://\s*(.*))?$"
+        self.re_var_1 = re.compile(self.str_var_1)
+        # type id = {  // comment
+        self.str_var_2 = rf"^\s*{s_type_id}\s*=\s*{{\s*.*?(?://\s*(.*))?$"
+        self.re_var_2 = re.compile(self.str_var_2)
 
         # プロトタイプ宣言
         # セミコロンだけ改行するようなケースはコーディング規約でなんとかして
-        self.str_prototype = rf"^\s*[^/][^/*].*?({s_id})\s*\([^)]*\)[^;]*;.*$"
+        self.str_prototype = rf"^\s*{s_type_id}\s*\([^)]*\)[^;]*;.*$"
         # 関数定義
-        self.str_func_def = rf"^\s*[^/][^/*].*?({s_id})\s*\([^)]*\)[^;]*$"
+        self.str_func_def = rf"^\s*{s_type_id}\s*\([^)]*\)[^;]*$"
         self.str_func_def_end = "^[^}]*}.*$"
         self.re_func_def_end = re.compile(self.str_func_def_end)
 
         # 解析バッファ
         # struct定義のネストは2つまで許可
-        self.log_struct_nest = 2
+        self.log_struct_nest = nest
         self.log_member = []  # メンバ変数ログ
         self.log_nest = []  # inner構造体ログ
         for i in range(self.log_struct_nest + 1):
@@ -170,7 +186,14 @@ class comment_get:
             self.log_nest.append([])
 
     def file_change(self, p: pathlib.Path) -> bool:
-        self.rel_path = p.relative_to(self.tgt_path)
+        match self.file_inf:
+            case comment_get.file_info.rel:
+                self.tgt_path = p.relative_to(self.base_path)
+            case comment_get.file_info.abs:
+                self.tgt_path = p
+            # case comment_get.file_info.ignore:
+            case _:
+                self.tgt_path = None
         print(f"file: {str(p)}")
 
     def proc_global_var(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
@@ -180,7 +203,17 @@ class comment_get:
         line = line.strip()
 
         # 変数チェック
-        m = self.re_var.search(line)
+        if self.check_re_var(self.re_var_1, line):
+            return gram.ExecResult.Reset_1
+        if self.check_re_var(self.re_var_2, line):
+            return gram.ExecResult.Reset_1
+
+        # 無条件ルールなのでなんでもいい
+        return gram.ExecResult.Reset_1
+
+    def check_re_var(self, regex: re.Pattern, line:str):
+        # 変数チェック
+        m = regex.search(line)
         if m is not None:
             # [0]=変数名, [1]=コメント
             parts = m.groups()
@@ -190,10 +223,12 @@ class comment_get:
             node.name = parts[0]
             node.comment = parts[1]
             # 変数登録
-            self.comment_map.var_map[(self.rel_path, node.name)] = node
-        
-        # 無条件ルールなのでなんでもいい
-        return gram.ExecResult.Reset_1
+            self.comment_map.var_map[(self.tgt_path, node.name)] = node
+            #
+            return True
+        #
+        return False
+
 
     def proc_struct_member_0(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
         """
@@ -219,16 +254,28 @@ class comment_get:
         """
         struct/union member取得: nest=1
         """
+        return self.proc_struct_member_n(line_no, line, cond_log, 1)
+
+    def proc_struct_member_2(self, line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
+        """
+        struct/union member取得: nest=2
+        """
+        return self.proc_struct_member_n(line_no, line, cond_log, 2)
+
+    def proc_struct_member_n(self, line_no: int, line: str, cond_log: gram.cond_log_list, nest: int) -> int:
+        """
+        struct/union member取得: nest>=1
+        """
         # nest=1で解析を行う
         line = line.strip()
-        result = self.proc_struct_member_impl(line_no, line, cond_log, 1)
+        result = self.proc_struct_member_impl(line_no, line, cond_log, nest)
         if result is not None:
             # comment_mapが返されたら解析終了
             # nestしているので解析結果を上位の解析に渡す
             # inner構造体なので変数宣言が前提とみなして、
             # 変数情報のみ展開する
             for node in result.var_map.items():
-                self.log_nest[1].append(node[1])
+                self.log_nest[nest].append(node[1])
             # 処理終了
             return gram.ExecResult.Reset_1
 
@@ -317,7 +364,7 @@ class comment_get:
                 node.name = inf[1]
             # 無名構造体でないとき、その名前でcomment_mapに登録
             if node.name is not None:
-                temp_map.type_map[(self.rel_path, node.name)] = node
+                temp_map.type_map[(self.tgt_path, node.name)] = node
             # コメントがあれば構造体の名称となる
             # 前知コメントがあればそちらを優先する
             if comment is not None and node.comment is None:
@@ -332,10 +379,10 @@ class comment_get:
             if post_name is not None:
                 if inf[0] is not None:
                     # 型登録
-                    temp_map.type_map[(self.rel_path, post_name)] = node
+                    temp_map.type_map[(self.tgt_path, post_name)] = node
                 else:
                     # 変数登録
-                    temp_map.var_map[(self.rel_path, post_name)] = node
+                    temp_map.var_map[(self.tgt_path, post_name)] = node
             # 処理終了
             self.log_member[nest] = []
             self.log_nest[nest + 1] = []
@@ -349,7 +396,7 @@ class comment_get:
         line = line.strip()
 
         # 変数チェック
-        m = self.re_var.search(line)
+        m = self.re_var_1.search(line)
         if m is not None:
             # [0]=変数名, [1]=コメント
             parts = m.groups()
@@ -363,7 +410,7 @@ class comment_get:
             if node.comment is None:
                 node.comment = comment
             # 変数登録
-            self.comment_map.var_map[(self.rel_path, node.name)] = node
+            self.comment_map.var_map[(self.tgt_path, node.name)] = node
             # 前置コメント消化したので次の行から解析再開
             return gram.ExecResult.Reset_1
 
@@ -392,14 +439,14 @@ class comment_get:
         return gram.ExecResult.Hold
 
 
-
-adapter = comment_get(tgt_path)
+adapter = comment_get(tgt_path, 3)
 
 
 # 作成ルールより深いstruct定義ネストがあれば警告を出す
 def unexpected_struct_def_nested_func(line_no: int, line: str, cond_log: gram.cond_log_list):
     print(f"unexpected struct def nested: {cond_log.get_filename()} :{line_no}: {line}")
     return gram.ExecResult.Reset_1
+
 
 rule_unexpected_struct_def_nested_1 = gram(adapter.str_struct_inner_1, unexpected_struct_def_nested_func)
 rule_unexpected_struct_def_nested_2 = gram(
@@ -414,14 +461,47 @@ rule_unexpected_struct_def_nested_2 = gram(
 def proc_terminate(line_no: int, line: str, cond_log: gram.cond_log_list) -> int:
     return gram.ExecResult.NextFile
 
+
 rule_terminate = gram(
     [
         r"//\s*解析.*$",
         r"//\s*ここまで.*$",
     ],
-    proc_terminate
+    proc_terminate,
 )
 
+
+precomm_struct3_1 = gram(
+    ("前置コメント+struct/struct/struct(1)", adapter.str_struct_inner_1),
+    [
+        # 4段階目のstructが出てきたらwarning
+        rule_unexpected_struct_def_nested_1,
+        rule_unexpected_struct_def_nested_2,
+        # member変数
+        adapter.proc_struct_member_2,
+    ],
+)
+precomm_struct3_2 = gram(
+    ("前置コメント+struct/struct/struct(2)", adapter.str_struct_inner_2),
+    [
+        # 4段階目のstructが出てきたらwarning
+        rule_unexpected_struct_def_nested_1,
+        rule_unexpected_struct_def_nested_2,
+        # member変数
+        adapter.proc_struct_member_2,
+    ],
+)
+
+precomm_struct_1 = gram(
+    ("前置コメント+struct/struct(1)", adapter.str_struct_inner_1),
+    [
+        # 3段階目のstructが出てきたらwarning
+        rule_unexpected_struct_def_nested_1,
+        rule_unexpected_struct_def_nested_2,
+        # member変数
+        adapter.proc_struct_member_1,
+    ],
+)
 
 rule = gram(
     None,
@@ -434,29 +514,62 @@ rule = gram(
             [
                 # 構造体
                 gram(
-                    adapter.str_struct,
+                    ("前置コメント+struct", adapter.str_struct),
                     [
                         # member
                         # inner構造体
                         gram(
-                            adapter.str_struct_inner_1,
+                            ("前置コメント+struct/struct(1)", adapter.str_struct_inner_1),
                             [
-                                # 3段階目のstructが出てきたらwarning
-                                rule_unexpected_struct_def_nested_1,
-                                rule_unexpected_struct_def_nested_2,
+                                # inner構造体
+                                gram(
+                                    ("前置コメント+struct/struct/struct(1)", adapter.str_struct_inner_1),
+                                    [
+                                        # 4段階目のstructが出てきたらwarning
+                                        rule_unexpected_struct_def_nested_1,
+                                        rule_unexpected_struct_def_nested_2,
+                                        # member変数
+                                        adapter.proc_struct_member_2,
+                                    ],
+                                ),
+                                gram(
+                                    ("前置コメント+struct/struct/struct(2)", adapter.str_struct_inner_2),
+                                    [
+                                        # 4段階目のstructが出てきたらwarning
+                                        rule_unexpected_struct_def_nested_1,
+                                        rule_unexpected_struct_def_nested_2,
+                                        # member変数
+                                        adapter.proc_struct_member_2,
+                                    ],
+                                ),
                                 # member変数
                                 adapter.proc_struct_member_1,
                             ],
                         ),
                         gram(
+                            ("前置コメント+struct/struct(2)", adapter.str_struct_inner_2),
                             [
-                                adapter.str_struct_inner_2_1,
-                                adapter.str_struct_inner_2_2,
-                            ],
-                            [
-                                # 3段階目のstructが出てきたらwarning
-                                rule_unexpected_struct_def_nested_1,
-                                rule_unexpected_struct_def_nested_2,
+                                # inner構造体
+                                gram(
+                                    ("前置コメント+struct/struct/struct(1)", adapter.str_struct_inner_1),
+                                    [
+                                        # 4段階目のstructが出てきたらwarning
+                                        rule_unexpected_struct_def_nested_1,
+                                        rule_unexpected_struct_def_nested_2,
+                                        # member変数
+                                        adapter.proc_struct_member_2,
+                                    ],
+                                ),
+                                gram(
+                                    ("前置コメント+struct/struct/struct(2)", adapter.str_struct_inner_2),
+                                    [
+                                        # 4段階目のstructが出てきたらwarning
+                                        rule_unexpected_struct_def_nested_1,
+                                        rule_unexpected_struct_def_nested_2,
+                                        # member変数
+                                        adapter.proc_struct_member_2,
+                                    ],
+                                ),
                                 # member変数
                                 adapter.proc_struct_member_1,
                             ],
@@ -472,29 +585,62 @@ rule = gram(
         ),
         # 構造体_前置コメントなし
         gram(
-            adapter.str_struct,
+            ("struct", adapter.str_struct),
             [
                 # member
                 # inner構造体
                 gram(
-                    adapter.str_struct_inner_1,
+                    ("struct/struct(1)", adapter.str_struct_inner_1),
                     [
-                        # 3段階目のstructが出てきたらwarning
-                        rule_unexpected_struct_def_nested_1,
-                        rule_unexpected_struct_def_nested_2,
+                        # inner構造体
+                        gram(
+                            ("struct/struct/struct(1)", adapter.str_struct_inner_1),
+                            [
+                                # 4段階目のstructが出てきたらwarning
+                                rule_unexpected_struct_def_nested_1,
+                                rule_unexpected_struct_def_nested_2,
+                                # member変数
+                                adapter.proc_struct_member_2,
+                            ],
+                        ),
+                        gram(
+                            ("struct/struct/struct(2)", adapter.str_struct_inner_2),
+                            [
+                                # 4段階目のstructが出てきたらwarning
+                                rule_unexpected_struct_def_nested_1,
+                                rule_unexpected_struct_def_nested_2,
+                                # member変数
+                                adapter.proc_struct_member_2,
+                            ],
+                        ),
                         # member変数
                         adapter.proc_struct_member_1,
                     ],
                 ),
                 gram(
+                    ("struct/struct(2)", adapter.str_struct_inner_2),
                     [
-                        adapter.str_struct_inner_2_1,
-                        adapter.str_struct_inner_2_2,
-                    ],
-                    [
-                        # 3段階目のstructが出てきたらwarning
-                        rule_unexpected_struct_def_nested_1,
-                        rule_unexpected_struct_def_nested_2,
+                        # inner構造体
+                        gram(
+                            ("struct/struct/struct(1)", adapter.str_struct_inner_1),
+                            [
+                                # 4段階目のstructが出てきたらwarning
+                                rule_unexpected_struct_def_nested_1,
+                                rule_unexpected_struct_def_nested_2,
+                                # member変数
+                                adapter.proc_struct_member_2,
+                            ],
+                        ),
+                        gram(
+                            ("struct/struct/struct(2)", adapter.str_struct_inner_2),
+                            [
+                                # 4段階目のstructが出てきたらwarning
+                                rule_unexpected_struct_def_nested_1,
+                                rule_unexpected_struct_def_nested_2,
+                                # member変数
+                                adapter.proc_struct_member_2,
+                            ],
+                        ),
                         # member変数
                         adapter.proc_struct_member_1,
                     ],
